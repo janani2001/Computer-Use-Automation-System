@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Member Detail - Banking System{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Member Details</h2>
+    
+    <div class="member-detail">
+        <p><strong>Member ID:</strong> {{ member.member_id }}</p>
+        <p><strong>Name:</strong> {{ member.name }}</p>
+        <p><strong>Email:</strong> {{ member.email }}</p>
+        <p><strong>Phone:</strong> {{ member.phone }}</p>
+        <p><strong>Joined:</strong> {{ member.joined_date }}</p>
+        <p>
+            <strong>Status:</strong> 
+            {% if member.account_status == 'active' %}
+            <span class="status-active">Active</span>
+            {% else %}
+            <span class="status-inactive">Inactive</span>
+            {% endif %}
+        </p>
+    </div>
+    
+    <div class="button-group">
+        <a href="{{ url_for('member_bp.search_members') }}" style="display: inline-block; flex: 1;">
+            <button class="btn-secondary" style="width: 100%;">← Back to Search</button>
+        </a>
+        <a href="{{ url_for('member_bp.update_balance', member_id=member.member_id) }}" style="display: inline-block; flex: 1;">
+            <button style="width: 100%;">Update Balance →</button>
+        </a>
+    </div>
+</div>
+
+{% if accounts %}
+<div class="card">
+    <h2>Accounts</h2>
+    
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Account Type</th>
+                <th>Balance</th>
+                <th>Last Transaction</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for account in accounts %}
+            <tr>
+                <td><strong>{{ account.account_type }}</strong></td>
+                <td>
+                    {% if account.account_type == 'Savings' %}
+                    <span class="savings-balance">${{ "%.2f"|format(account.balance) }}</span>
+                    {% else %}
+                    <span style="font-size: 16px; font-weight: bold;">${{ "%.2f"|format(account.balance) }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ account.last_transaction }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if transactions %}
+<div class="card">
+    <h2>Recent Transactions</h2>
+    
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Account Type</th>
+                <th>Amount</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for txn in transactions %}
+            <tr>
+                <td>{{ txn.transaction_date }}</td>
+                <td>{{ txn.account_type }}</td>
+                <td>${{ "%.2f"|format(txn.amount) }}</td>
+                <td>{{ txn.description }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

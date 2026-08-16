@@ -1,0 +1,1 @@
+{"artifact_id": "look_up_member_m001_and_read_their_savings_balance", "step_id": "step_3b", "action": "click", "reason": "Page.click: Timeout 30000ms exceeded.\nCall log:\nwaiting for locator(\"text=View Details\")\n", "escalated_at": "2026-08-16T13:29:05.205818"}

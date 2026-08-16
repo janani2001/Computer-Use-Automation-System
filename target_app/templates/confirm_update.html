@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Update - Banking System{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Confirm Balance Update</h2>
+    
+    <div class="info">
+        Please review the following information before confirming:
+    </div>
+    
+    <div class="member-detail">
+        <p><strong>Member:</strong> {{ member.name }} ({{ member.member_id }})</p>
+        <p><strong>Account Type:</strong> {{ pending.account_type }}</p>
+        <p><strong>New Balance:</strong> ${{ pending.new_balance }}</p>
+        {% if pending.notes %}
+        <p><strong>Notes:</strong> {{ pending.notes }}</p>
+        {% endif %}
+    </div>
+    
+    <form method="POST" id="confirm_update_form">
+        <div class="button-group">
+            <button type="submit" name="action" value="cancel" class="btn-secondary">← Back to Form</button>
+            <button type="submit" name="action" value="confirm" class="btn-success">✓ Confirm Update</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Important Notice</h3>
+    <p>This action will permanently update the member's account balance. Please ensure all information is correct before confirming.</p>
+</div>
+{% endblock %}

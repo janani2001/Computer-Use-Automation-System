@@ -3,11 +3,31 @@
 Entry point for deterministic replay of saved artifacts.
 
 Usage:
-    python replay.py --artifact artifacts/lookup_member_v1.json --member_id 12345
+    python replay.py --artifact artifacts/lookup_member_v1.json \
+        --target "http://127.0.0.1:5000" --params '{"member_id": "M001"}'
 """
 
 import argparse
+import asyncio
 import json
+import logging
+from pathlib import Path
+
+from src.agent.browser import BrowserManager
+from src.agent.parser import ResponseParser
+from src.replay.engine import ReplayEngine
+
+logging.basicConfig(level=logging.INFO)
+
+
+async def _run(artifact_path: Path, target_url: str, params: dict, headless: bool) -> None:
+    artifact = ResponseParser().load_artifact(artifact_path)
+
+    engine = ReplayEngine(BrowserManager())
+    result = await engine.run(artifact, target_url=target_url, params=params, headless=headless)
+
+    print(json.dumps(result.model_dump(), indent=2, default=str))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -19,14 +39,23 @@ if __name__ == "__main__":
         help="Path to the artifact JSON file",
     )
     parser.add_argument(
+        "--target",
+        required=True,
+        help="Target application URL (e.g. http://127.0.0.1:5000)",
+    )
+    parser.add_argument(
         "--params",
         type=json.loads,
         default="{}",
-        help="Input parameters as JSON (e.g., '{\"member_id\": \"12345\"}')",
+        help="Input parameters as JSON (e.g., '{\"member_id\": \"M001\"}')",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run the browser without a visible window",
     )
 
     args = parser.parse_args()
 
-    print(f"Artifact: {args.artifact}")
-    print(f"Parameters: {args.params}")
-    print("\n[TODO] Implement deterministic replay engine")
+    asyncio.run(_run(Path(args.artifact), args.target, args.params, args.headless))
+

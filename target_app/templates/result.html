@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Update Result - Banking System{% endblock %}
+
+{% block content %}
+{% if result and result.success %}
+<div class="card">
+    <div class="success">
+        <h2 style="margin-bottom: 10px; color: #155724;">✓ {{ result.message }}</h2>
+    </div>
+    
+    <div class="member-detail">
+        <p><strong>Member:</strong> {{ member.name }} ({{ member.member_id }})</p>
+        <p><strong>Account Type:</strong> {{ result.account_type }}</p>
+        <p><strong>New Balance:</strong> ${{ result.new_balance }}</p>
+        <p><strong>Updated At:</strong> {{ result.updated_at }}</p>
+    </div>
+    
+    <div class="button-group">
+        <a href="{{ url_for('member_bp.member_detail', member_id=member.member_id) }}" style="display: inline-block; flex: 1;">
+            <button style="width: 100%;">← Back to Member Details</button>
+        </a>
+        <a href="{{ url_for('member_bp.search_members') }}" style="display: inline-block; flex: 1;">
+            <button class="btn-secondary" style="width: 100%;">Search Another Member</button>
+        </a>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="error">
+        <h2>Error Processing Update</h2>
+        <p>An error occurred while processing your request. Please try again.</p>
+    </div>
+    <a href="{{ url_for('member_bp.search_members') }}">
+        <button>← Return to Search</button>
+    </a>
+</div>
+{% endif %}
+{% endblock %}

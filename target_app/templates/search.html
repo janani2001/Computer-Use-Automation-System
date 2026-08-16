@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Search Members - Banking System{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Search Members</h2>
+    
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+    
+    <form method="POST" id="search_form">
+        <div class="form-group">
+            <label for="member_id_input">Member ID or Name:</label>
+            <input type="text" id="member_id_input" name="member_id_or_name" placeholder="Enter member ID (e.g., M001) or name" required>
+        </div>
+        <button type="submit" id="member_search_btn">Search</button>
+    </form>
+</div>
+
+{% if results %}
+<div class="card">
+    <h2>Search Results ({{ results|length }} found)</h2>
+    
+    {% if results|length > 0 %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Member ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in results %}
+            <tr>
+                <td><strong>{{ member.member_id }}</strong></td>
+                <td>{{ member.name }}</td>
+                <td>{{ member.email }}</td>
+                <td>{{ member.phone }}</td>
+                <td>
+                    {% if member.account_status == 'active' %}
+                    <span class="status-active">Active</span>
+                    {% else %}
+                    <span class="status-inactive">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('member_bp.member_detail', member_id=member.member_id) }}">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if not results and search_term %}
+<div class="card">
+    <p style="color: #666;">No results found. Try a different search term.</p>
+</div>
+{% endif %}
+{% endblock %}

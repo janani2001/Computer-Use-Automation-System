@@ -7,7 +7,21 @@ Usage:
 """
 
 import argparse
+import asyncio
 import logging
+
+from src.agent.agent import DiscoveryAgent
+
+logging.basicConfig(level=logging.INFO)
+
+
+async def _run(goal: str, target: str, headless: bool) -> None:
+    agent = DiscoveryAgent(headless=headless)
+    artifact = await agent.discover(target_url=target, goal=goal)
+
+    print(f"\nArtifact ID: {artifact.id}")
+    print(f"Steps discovered: {len(artifact.steps)}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -24,14 +38,15 @@ if __name__ == "__main__":
         help="Target application URL or entry point",
     )
     parser.add_argument(
-        "--output",
-        default="artifacts/",
-        help="Directory to save artifacts (default: artifacts/)",
+        "--headless",
+        action="store_true",
+        help="Run the browser without a visible window",
     )
 
     args = parser.parse_args()
 
     print(f"Goal: {args.goal}")
     print(f"Target: {args.target}")
-    print(f"Output: {args.output}")
-    print("\n[TODO] Implement agent discovery loop")
+
+    asyncio.run(_run(args.goal, args.target, args.headless))
+

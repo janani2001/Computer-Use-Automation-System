@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Banking System{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Welcome to Banking System</h2>
+    <p>This is a mock banking application for testing automation workflows.</p>
+    
+    <div style="margin-top: 20px;">
+        <h3>Quick Actions:</h3>
+        <div class="button-group">
+            <a href="{{ url_for('member_bp.search_members') }}" style="display: inline-block;">
+                <button>🔍 Search Members</button>
+            </a>
+        </div>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Sample Member IDs:</h3>
+        <p>Try searching for any of these:</p>
+        <ul style="margin-left: 20px; margin-top: 10px;">
+            <li>M001 - John Doe</li>
+            <li>M002 - Jane Smith</li>
+            <li>M003 - Bob Johnson</li>
+            <li>M004 - Alice Williams</li>
+            <li>M005 - Charlie Brown</li>
+        </ul>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Typical Flow:</h3>
+        <ol style="margin-left: 20px; margin-top: 10px;">
+            <li>Search for a member by ID or name</li>
+            <li>View member details and accounts</li>
+            <li>Update account balance</li>
+            <li>Confirm the update</li>
+            <li>View result</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}
