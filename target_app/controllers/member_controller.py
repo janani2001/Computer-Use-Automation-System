@@ -7,11 +7,15 @@ per URL and no request.method branching anywhere in this file.
 
 from datetime import datetime
 
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
 from flask.views import MethodView
 
 from target_app.repositories.member_repository import MemberRepository
-from target_app.services.member_service import DefaultMemberService, MemberService
+from target_app.services.member_service import (
+    BalanceUpdateSystemError,
+    DefaultMemberService,
+    MemberService,
+)
 
 member_bp = Blueprint("member_bp", __name__)
 member_service: MemberService = DefaultMemberService(MemberRepository())
@@ -100,7 +104,25 @@ class ConfirmUpdateView(MethodView):
             return redirect(url_for("member_bp.update_balance", member_id=member_id))
 
         action = request.form.get("action")
-        decision = member_service.handle_balance_update(member_id, action, pending)
+
+        try:
+            if (
+                action == "confirm"
+                and current_app.config.get("SIMULATE_BALANCE_UPDATE_FAILURE", False)
+            ):
+                raise BalanceUpdateSystemError(
+                    "The banking update service returned HTTP 500. Verify the account state before retrying."
+                )
+
+            decision = member_service.handle_balance_update(member_id, action, pending)
+        except BalanceUpdateSystemError as exc:
+            current_app.logger.exception("Balance update system failure")
+            return render_template(
+                "system_error.html",
+                member=detail["member"],
+                error_message=str(exc),
+                retry_url=url_for("member_bp.confirm_update", member_id=member_id),
+            ), 500
 
         if decision["status"] == "cancelled":
             session.pop("pending_update", None)

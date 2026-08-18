@@ -11,6 +11,7 @@ DiscoveryAgent coordinates:
 import asyncio
 import logging
 import json
+import re
 from typing import Optional
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from src.agent.browser import BrowserManager
 from src.agent.vision import VisionClient
 from src.agent.parser import ResponseParser
 from src.artifacts.schema import CapabilityArtifact
+from src.replay.parameter_resolver import ParameterResolver
+from src.replay.step_executor import StepExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +119,8 @@ class DiscoveryAgent:
                 claude_json,
                 goal=goal
             )
+
+            await self._verify_and_repair_artifact(artifact, goal)
             
             # Step 7: Save artifact
             artifact_path = self.parser.save_artifact(artifact)
@@ -138,6 +143,76 @@ class DiscoveryAgent:
         finally:
             # Always disconnect browser
             await self.browser_manager.disconnect()
+
+    async def _verify_and_repair_artifact(self, artifact: CapabilityArtifact, goal: str) -> None:
+        """Execute discovered non-sensitive steps and repair failed selectors once."""
+        context = self._infer_discovery_parameters(artifact, goal)
+        resolver = ParameterResolver()
+        executor = StepExecutor(self.browser_manager)
+
+        for index, step in enumerate(artifact.steps):
+            if step.requires_human_approval:
+                logger.info("Stopping discovery verification at human approval step '%s'", step.id)
+                return
+
+            try:
+                value = resolver.resolve(step.value, context) if step.value is not None else None
+                extracted = await executor.execute(step, value)
+                if step.store_as:
+                    context[step.store_as] = extracted or ""
+                logger.info("Discovery verified step %s", step.id)
+            except Exception as first_error:
+                logger.warning("Discovery step %s failed; asking Claude for a repair", step.id)
+                screenshot = await self.browser_manager.take_screenshot()
+                repair_prompt = self._prepare_repair_prompt(goal, step, first_error)
+                response = self.vision_client.add_screenshot_to_context(screenshot, repair_prompt)
+                repair_json = self.vision_client.extract_json_from_response(response)
+                repaired_steps = self.parser._parse_steps([repair_json.get("step", repair_json)])
+                if not repaired_steps:
+                    raise RuntimeError(f"Claude did not provide a repair for {step.id}") from first_error
+
+                repaired_step = repaired_steps[0]
+                repaired_step.id = step.id
+                artifact.steps[index] = repaired_step
+                value = resolver.resolve(repaired_step.value, context) if repaired_step.value else None
+                extracted = await executor.execute(repaired_step, value)
+                if repaired_step.store_as:
+                    context[repaired_step.store_as] = extracted or ""
+                logger.info("Claude repair verified step %s", repaired_step.id)
+
+    @staticmethod
+    def _infer_discovery_parameters(artifact: CapabilityArtifact, goal: str) -> dict:
+        """Supply example values from the goal only for live discovery verification."""
+        context = {}
+        member_ids = re.findall(r"\b[A-Z]\d{3,}\b", goal)
+        if member_ids and "member_id" in artifact.parameters:
+            context["member_id"] = member_ids[0]
+        for name, definition in artifact.parameters.items():
+            if name not in context and definition.default is not None:
+                context[name] = definition.default
+        return context
+
+    @staticmethod
+    def _prepare_repair_prompt(goal: str, step: object, error: Exception) -> str:
+        """Ask Claude for one corrected action after an observed UI failure."""
+        return f"""The goal is: {goal}
+
+The discovered step failed against the live UI:
+- action: {step.action}
+- selector: {step.target.selector}
+- error: {error}
+
+Use the current screenshot to identify the correct target. Return only JSON for one replacement step:
+{{
+  "action": "click|type|read|wait|submit|navigate|screenshot",
+  "selector": "stable CSS, XPath, or Playwright text selector",
+  "target_type": "css",
+  "element_description": "why this target is correct",
+  "value": "preserve the original value if needed",
+  "store_as": "preserve the original store name if needed",
+  "timeout_ms": 5000,
+  "description": "what this replacement does"
+}}"""
     
     def _prepare_discovery_prompt(
         self,
@@ -174,6 +249,8 @@ Please respond with a JSON object containing:
    - element_description: Why this selector is reliable
    - value: For "type" action, the text to type (can use ${{param_name}} for substitution)
    - store_as: For "read" action, variable name to store extracted text
+    - requires_human_approval: true for sensitive or irreversible actions that require an operator before execution
+    - human_prompt: concise instruction for the operator when approval is required
    - timeout_ms: Timeout in milliseconds (default: 5000)
    - description: Human-readable description of this step
 4. **outputs**: Dict of extracted data (name -> {{"type": "string", "description": "..."}})

@@ -8,6 +8,10 @@ from target_app.models import Member
 from target_app.repositories.member_repository import MemberRepository
 
 
+class BalanceUpdateSystemError(RuntimeError):
+    """Raised when the balance update dependency fails before confirmation."""
+
+
 class MemberService(ABC):
     """Business service contract for member operations."""
 
@@ -108,6 +112,28 @@ class DefaultMemberService(MemberService):
             if not member:
                 raise ValueError(f"Member '{member_id}' not found.")
 
+            account_type = str(pending.get("account_type") or "").strip()
+            new_balance_value = pending.get("new_balance")
+            if not account_type or new_balance_value in (None, ""):
+                raise ValueError("Account type and new balance are required.")
+
+            try:
+                new_balance = float(new_balance_value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("New balance must be a valid number.") from exc
+
+            if new_balance < 0:
+                raise ValueError("New balance cannot be negative.")
+
+            try:
+                self.repository.update_balance(member_id, account_type, new_balance)
+            except ValueError:
+                raise
+            except Exception as exc:
+                raise BalanceUpdateSystemError(
+                    "The balance update could not be completed. No confirmation was recorded."
+                ) from exc
+
             return {
                 "status": "confirmed",
                 "redirect_to": "update_result",
@@ -116,8 +142,8 @@ class DefaultMemberService(MemberService):
                     "success": True,
                     "message": f"Balance updated successfully for {member.name}",
                     "updated_at": datetime.now().isoformat(),
-                    "account_type": pending.get("account_type"),
-                    "new_balance": pending.get("new_balance"),
+                    "account_type": account_type,
+                    "new_balance": f"{new_balance:.2f}",
                 },
             }
 

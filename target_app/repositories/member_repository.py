@@ -7,6 +7,7 @@ from target_app.database import (
     get_member_accounts,
     get_member_transactions,
     search_members,
+        update_account_balance,
 )
 from target_app.models import Member, Account, Transaction
 
@@ -25,3 +26,6 @@ class MemberRepository:
 
     def get_transactions(self, member_id: str, limit: int = 5) -> List[Transaction]:
         return get_member_transactions(member_id, limit=limit)
+
+    def update_balance(self, member_id: str, account_type: str, new_balance: float) -> None:
+        update_account_balance(member_id, account_type, new_balance)

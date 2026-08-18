@@ -33,7 +33,7 @@ class VisionClient:
             raise ValueError("ANTHROPIC_API_KEY not set")
         
         self.client = Anthropic(api_key=api_key)
-        self.model = "claude-3-5-sonnet-20241022"
+        self.model = "claude-sonnet-4-5-20250929"
         self.conversation_history = []
         
         logger.info(f"✅ Vision client initialized (model={self.model})")

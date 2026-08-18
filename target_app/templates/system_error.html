@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Update Unavailable - Banking System{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="error">
+        <h2>Balance Update Unavailable</h2>
+        <p>The banking service could not complete this update.</p>
+        <p><strong>No confirmation was recorded.</strong> Verify the account state before retrying.</p>
+    </div>
+
+    <div class="member-detail">
+        <p><strong>Member:</strong> {{ member.name }} ({{ member.member_id }})</p>
+        <p><strong>Reference:</strong> Review the application logs and escalation record.</p>
+    </div>
+
+    <div class="button-group">
+        <a href="{{ retry_url }}" style="display: inline-block; flex: 1;">
+            <button style="width: 100%;">Return to Confirmation</button>
+        </a>
+        <a href="{{ url_for('member_bp.member_detail', member_id=member.member_id) }}" style="display: inline-block; flex: 1;">
+            <button type="button" class="btn-secondary" style="width: 100%;">Review Member</button>
+        </a>
+    </div>
+</div>
+{% endblock %}

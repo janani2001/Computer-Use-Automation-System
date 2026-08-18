@@ -8,6 +8,7 @@ This file is intentionally thin and only wires together the layers.
 """
 
 from flask import Flask
+import os
 
 from target_app.database import init_db
 from target_app.controllers.member_controller import member_bp
@@ -16,6 +17,9 @@ from target_app.controllers.member_controller import member_bp
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = "demo-banking-app-secret-key"
+    app.config["SIMULATE_BALANCE_UPDATE_FAILURE"] = (
+        os.getenv("MOCK_BANK_SIMULATE_UPDATE_FAILURE", "0") == "1"
+    )
 
     init_db()
     app.register_blueprint(member_bp)

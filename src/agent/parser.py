@@ -180,6 +180,8 @@ class ResponseParser:
                     target=target,
                     value=step_info.get("value"),
                     store_as=step_info.get("store_as"),
+                    requires_human_approval=step_info.get("requires_human_approval", False),
+                    human_prompt=step_info.get("human_prompt"),
                     timeout_ms=step_info.get("timeout_ms", 5000),
                     description=step_info.get("description", ""),
                 )

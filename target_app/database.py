@@ -193,6 +193,25 @@ def get_account_balance(member_id: str, account_type: str) -> Optional[float]:
     return row['balance'] if row else None
 
 
+def update_account_balance(member_id: str, account_type: str, new_balance: float) -> None:
+    """Persist a confirmed account balance update."""
+    db = get_db()
+    try:
+        cursor = db.execute(
+            """
+            UPDATE accounts
+            SET balance = ?, last_transaction = ?
+            WHERE member_id = ? AND account_type = ?
+            """,
+            (new_balance, "Manual balance update", member_id, account_type),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"Account '{account_type}' not found for member '{member_id}'.")
+        db.commit()
+    finally:
+        db.close()
+
+
 # ============ TRANSACTION QUERIES ============
 
 def get_member_transactions(member_id: str, limit: int = 10) -> List[Transaction]:

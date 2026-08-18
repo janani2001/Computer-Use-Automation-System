@@ -10,9 +10,12 @@ import argparse
 import asyncio
 import logging
 
+from dotenv import load_dotenv
+
 from src.agent.agent import DiscoveryAgent
 
 logging.basicConfig(level=logging.INFO)
+load_dotenv()
 
 
 async def _run(goal: str, target: str, headless: bool) -> None:

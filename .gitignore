@@ -33,7 +33,11 @@ wheels/
 
 # Environment
 .env
+.env.save
 .env.local
+.env.*.save
+*.env
+*.env.rtf
 *.pem
 *.key
 

@@ -20,11 +20,23 @@ from src.replay.engine import ReplayEngine
 logging.basicConfig(level=logging.INFO)
 
 
-async def _run(artifact_path: Path, target_url: str, params: dict, headless: bool) -> None:
+async def _run(
+    artifact_path: Path,
+    target_url: str,
+    params: dict,
+    headless: bool,
+    interactive: bool,
+) -> None:
     artifact = ResponseParser().load_artifact(artifact_path)
 
     engine = ReplayEngine(BrowserManager())
-    result = await engine.run(artifact, target_url=target_url, params=params, headless=headless)
+    result = await engine.run(
+        artifact,
+        target_url=target_url,
+        params=params,
+        headless=headless,
+        interactive=interactive,
+    )
 
     print(json.dumps(result.model_dump(), indent=2, default=str))
 
@@ -54,8 +66,18 @@ if __name__ == "__main__":
         action="store_true",
         help="Run the browser without a visible window",
     )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Pause for a human to fix the browser state, then retry the failed step",
+    )
 
     args = parser.parse_args()
 
-    asyncio.run(_run(Path(args.artifact), args.target, args.params, args.headless))
+    if args.interactive and args.headless:
+        parser.error("--interactive requires a visible browser; remove --headless")
+
+    asyncio.run(
+        _run(Path(args.artifact), args.target, args.params, args.headless, args.interactive)
+    )
 

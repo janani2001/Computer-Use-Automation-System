@@ -19,6 +19,8 @@ from typing import Dict, Optional
 from src.agent.browser import BrowserManager
 from src.artifacts.schema import AutomationStep, CapabilityArtifact, ReplayResult
 from src.escalation.handler import EscalationHandler
+from src.escalation.intervention import HumanIntervention
+from src.logging.audit import AuditLogger
 from src.replay.error_policy import ErrorPolicy
 from src.replay.parameter_resolver import ParameterResolver
 from src.replay.step_executor import StepExecutor
@@ -38,12 +40,16 @@ class ReplayEngine:
         browser_manager: BrowserManager,
         safety_guard: Optional[SafetyGuard] = None,
         escalation_handler: Optional[EscalationHandler] = None,
+        human_intervention: Optional[HumanIntervention] = None,
+        audit_logger: Optional[AuditLogger] = None,
     ):
         self.browser_manager = browser_manager
         self.parameter_resolver = ParameterResolver()
         self.step_executor = StepExecutor(browser_manager)
         self.safety_guard = safety_guard or SafetyGuard()
         self.escalation_handler = escalation_handler or EscalationHandler()
+        self.human_intervention = human_intervention or HumanIntervention()
+        self.audit_logger = audit_logger or AuditLogger()
         self.error_policy = ErrorPolicy()
 
     async def run(
@@ -52,6 +58,7 @@ class ReplayEngine:
         target_url: str,
         params: Dict[str, str],
         headless: bool = True,
+        interactive: bool = False,
     ) -> ReplayResult:
         """
         Execute every step of `artifact` in order.
@@ -67,6 +74,7 @@ class ReplayEngine:
         """
         self.safety_guard.check_artifact(artifact)
         self.parameter_resolver.validate_required(artifact, params)
+        self.audit_logger.event("replay_started", artifact_id=artifact.id)
 
         # `context` holds parameter values plus anything steps "read" and
         # stored, so later steps (and final outputs) can reference them.
@@ -79,17 +87,31 @@ class ReplayEngine:
             for step in artifact.steps:
                 self.safety_guard.check_step(step)
                 logger.info(f"[{step.id}] {step.action} -> {step.target.selector}")
+                self.audit_logger.event("step_started", artifact_id=artifact.id, step_id=step.id, action=step.action)
 
-                outcome = await self._run_step_with_recovery(artifact, step, context, steps_completed)
+                if step.requires_human_approval:
+                    if not interactive:
+                        raise RuntimeError(
+                            f"Step '{step.id}' requires human approval; rerun with --interactive"
+                        )
+                    await self.human_intervention.wait_for_operator(
+                        step.human_prompt or self._approval_prompt(step)
+                    )
+
+                outcome = await self._run_step_with_recovery(
+                    artifact, step, context, steps_completed, interactive
+                )
                 if outcome is not None:
                     # A declared error handler resolved this step's failure
                     # into a final result (business_outcome, or an escalation).
                     return outcome
 
                 steps_completed += 1
+                self.audit_logger.event("step_completed", artifact_id=artifact.id, step_id=step.id)
 
             outputs = {name: context.get(name, "") for name in artifact.outputs}
             logger.info(f"✅ Replay succeeded: {redact(str(outputs))}")
+            self.audit_logger.event("replay_succeeded", artifact_id=artifact.id, steps_completed=steps_completed)
 
             return ReplayResult(
                 status="success",
@@ -99,6 +121,7 @@ class ReplayEngine:
 
         except Exception as exc:
             logger.error(f"❌ Replay failed after {steps_completed} step(s): {redact(str(exc))}")
+            self.audit_logger.event("replay_failed", artifact_id=artifact.id, steps_completed=steps_completed, error=str(exc))
             escalation = self.escalation_handler.escalate(
                 artifact_id=artifact.id,
                 step=artifact.steps[steps_completed] if steps_completed < len(artifact.steps) else artifact.steps[-1],
@@ -119,6 +142,7 @@ class ReplayEngine:
         step: AutomationStep,
         context: Dict[str, str],
         steps_completed_before: int,
+        interactive: bool,
     ) -> Optional[ReplayResult]:
         """
         Execute one step, retrying/skipping/escalating per its declared
@@ -129,6 +153,8 @@ class ReplayEngine:
             continue; a ReplayResult if the failure produced a final outcome.
         """
         attempts_allowed = 1 + _MAX_RETRIES
+
+        intervention_used = False
 
         for attempt in range(1, attempts_allowed + 1):
             try:
@@ -163,5 +189,42 @@ class ReplayEngine:
                         steps_completed=steps_completed_before,
                     )
 
+                if interactive and not intervention_used:
+                    intervention_used = True
+                    action_required = self._human_action_required(step, exc)
+                    self.escalation_handler.escalate(
+                        artifact_id=artifact.id,
+                        step=step,
+                        reason=action_required,
+                    )
+                    await self.human_intervention.wait_for_operator(action_required)
+                    continue
+
                 # No handler, or explicit "escalate": fail safe by default.
                 raise
+
+    @staticmethod
+    def _human_action_required(step: AutomationStep, error: Exception) -> str:
+        """Describe the failed step and the action needed before retry."""
+        target = step.target.selector or step.target.accessibility_label or "the target element"
+        suggested_action = (
+            "If search results are visible, open the matching member's View Details link."
+            if step.action == "wait"
+            else "Complete the missing browser action manually."
+        )
+        return (
+            f"Replay paused at {step.id} ({step.description}).\n"
+            f"The expected target is {target}.\n"
+            f"Failure: {error}\n"
+            f"Suggested action: {suggested_action}\n"
+            "Resolve the issue in the open browser, then resume."
+        )
+
+    @staticmethod
+    def _approval_prompt(step: AutomationStep) -> str:
+        """Describe the sensitive action that needs human authorization."""
+        return (
+            f"Approval required before {step.id} ({step.description}).\n"
+            "Complete the sensitive data entry and review it in the browser.\n"
+            "Press Enter only after the value and target account are correct."
+        )
