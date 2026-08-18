@@ -58,7 +58,6 @@ This will:
 │   ├── replay/          # Deterministic replay engine
 │   ├── artifacts/       # Schema definitions & storage
 │   ├── safety/          # Policy enforcement & guardrails
-│   ├── surface/         # Browser control (Playwright)
 │   ├── escalation/      # Human-in-the-loop
 │   └── logging/         # Structured logging
 ├── target_app/          # Mock banking app (Flask)
@@ -69,6 +68,38 @@ This will:
 ├── README.md            # This file
 └── requirements.txt     # Dependencies
 ```
+
+## Architecture
+
+```mermaid
+flowchart LR
+	Goal[User goal] --> Discovery[DiscoveryAgent]
+	Discovery --> Browser[BrowserManager<br/>Playwright]
+	Discovery --> Vision[VisionClient<br/>Claude vision]
+	Discovery --> Parser[ResponseParser]
+	Parser --> Artifact[CapabilityArtifact<br/>validated JSON]
+
+	Artifact --> Replay[ReplayEngine]
+	Replay --> Safety[SafetyGuard]
+	Safety --> Resolver[ParameterResolver]
+	Resolver --> Executor[StepExecutor]
+	Executor --> Browser
+	Replay --> Policy[ErrorPolicy]
+	Policy --> Intervention[HumanIntervention]
+	Replay --> Audit[AuditLogger]
+	Replay --> Escalation[EscalationHandler]
+
+	Browser --> Bank[target_app<br/>legacy banking UI]
+	Bank --> Controller[Controller]
+	Controller --> Service[Service]
+	Service --> Repository[Repository]
+	Repository --> Database[(SQLite)]
+```
+
+Discovery uses Claude only to understand the UI and produce a validated
+artifact. Replay uses the saved artifact deterministically and does not call
+Claude. Safety checks run before browser actions, while failures can pause for
+human intervention or create an escalation record.
 
 ## Next Steps
 
