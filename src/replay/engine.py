@@ -110,6 +110,11 @@ class ReplayEngine:
                 self.audit_logger.event("step_completed", artifact_id=artifact.id, step_id=step.id)
 
             outputs = {name: context.get(name, "") for name in artifact.outputs}
+            missing_outputs = [name for name, value in outputs.items() if not value]
+            if missing_outputs:
+                raise RuntimeError(
+                    f"Replay completed steps but did not produce required outputs: {missing_outputs}"
+                )
             logger.info(f"✅ Replay succeeded: {redact(str(outputs))}")
             self.audit_logger.event("replay_succeeded", artifact_id=artifact.id, steps_completed=steps_completed)
 

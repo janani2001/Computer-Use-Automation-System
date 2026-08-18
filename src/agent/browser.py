@@ -17,6 +17,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from src.artifacts.schema import ElementTarget
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,24 @@ class BrowserManager:
         except Exception as e:
             logger.error(f"❌ Failed to click {selector}: {e}")
             raise
+
+    async def click_target(self, target: ElementTarget) -> None:
+        """Click a target using its declared locator strategy."""
+        if not self.page:
+            raise RuntimeError("Browser not connected")
+        if target.type == "image":
+            if not target.coordinates:
+                raise ValueError("Image target requires coordinates")
+            await self.page.mouse.click(target.coordinates[0], target.coordinates[1])
+            return
+        if target.type == "accessibility":
+            if not target.accessibility_label:
+                raise ValueError("Accessibility target requires accessibility_label")
+            await self.page.get_by_label(target.accessibility_label).click()
+            return
+        if not target.selector:
+            raise ValueError("CSS/XPath target requires selector")
+        await self.page.click(target.selector)
     
     async def type_text(self, selector: str, text: str) -> None:
         """
@@ -142,6 +161,21 @@ class BrowserManager:
         except Exception as e:
             logger.error(f"❌ Failed to type into {selector}: {e}")
             raise
+
+    async def type_target(self, target: ElementTarget, text: str) -> None:
+        """Fill a target using its declared locator strategy."""
+        if not self.page:
+            raise RuntimeError("Browser not connected")
+        if target.type == "accessibility":
+            if not target.accessibility_label:
+                raise ValueError("Accessibility target requires accessibility_label")
+            await self.page.get_by_label(target.accessibility_label).fill(text)
+            return
+        if target.type == "image":
+            raise ValueError("Image targets cannot receive text")
+        if not target.selector:
+            raise ValueError("CSS/XPath target requires selector")
+        await self.page.fill(target.selector, text)
     
     async def wait_for_element(self, selector: str, timeout_ms: int = 5000) -> None:
         """
@@ -165,6 +199,23 @@ class BrowserManager:
         except Exception as e:
             logger.error(f"❌ Timeout waiting for {selector}: {e}")
             raise
+
+    async def wait_for_target(self, target: ElementTarget, timeout_ms: int = 5000) -> None:
+        """Wait for a target using its declared locator strategy."""
+        if not self.page:
+            raise RuntimeError("Browser not connected")
+        if target.type == "accessibility":
+            if not target.accessibility_label:
+                raise ValueError("Accessibility target requires accessibility_label")
+            await self.page.get_by_label(target.accessibility_label).wait_for(timeout=timeout_ms)
+            return
+        if target.type == "image":
+            if not target.coordinates:
+                raise ValueError("Image target requires coordinates")
+            return
+        if not target.selector:
+            raise ValueError("CSS/XPath target requires selector")
+        await self.page.wait_for_selector(target.selector, timeout=timeout_ms)
     
     async def read_element_text(self, selector: str) -> str:
         """
@@ -187,6 +238,20 @@ class BrowserManager:
         except Exception as e:
             logger.error(f"❌ Failed to read text from {selector}: {e}")
             raise
+
+    async def read_target_text(self, target: ElementTarget) -> str:
+        """Read text from a target using its declared locator strategy."""
+        if not self.page:
+            raise RuntimeError("Browser not connected")
+        if target.type == "accessibility":
+            if not target.accessibility_label:
+                raise ValueError("Accessibility target requires accessibility_label")
+            return await self.page.get_by_label(target.accessibility_label).inner_text()
+        if target.type == "image":
+            raise ValueError("Image targets cannot provide text")
+        if not target.selector:
+            raise ValueError("CSS/XPath target requires selector")
+        return await self.page.inner_text(target.selector)
     
     async def get_page_content(self) -> str:
         """

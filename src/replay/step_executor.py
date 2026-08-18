@@ -40,11 +40,11 @@ class StepExecutor:
         selector = step.target.selector
 
         if step.action == "click":
-            await self.browser_manager.click(selector)
+            await self.browser_manager.click_target(step.target)
             return None
 
         if step.action == "type":
-            await self.browser_manager.type_text(selector, resolved_value or "")
+            await self.browser_manager.type_target(step.target, resolved_value or "")
             return None
 
         if step.action == "submit":
@@ -52,11 +52,11 @@ class StepExecutor:
             return None
 
         if step.action == "wait":
-            await self.browser_manager.wait_for_element(selector, timeout_ms=step.timeout_ms)
+            await self.browser_manager.wait_for_target(step.target, timeout_ms=step.timeout_ms)
             return None
 
         if step.action == "read":
-            return await self.browser_manager.read_element_text(selector)
+            return await self.browser_manager.read_target_text(step.target)
 
         if step.action == "navigate":
             await self.browser_manager.navigate(resolved_value or selector)
